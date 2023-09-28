@@ -198,7 +198,7 @@ class FIFOBase
         return true;
     }
 
-    /** removes the element "idx" positions behind the first element 
+    /** removes the element "idx" positions behind the first element
      *  and returns true if successful */
     bool Remove(size_t idx)
     {
@@ -245,7 +245,7 @@ class FIFOBase
                 numRemoved++;
                 Remove(idx);
                 // was that the last element?
-                if(idx == int(GetNumElements()) - 1)
+                if(idx == int(GetNumElements()) - 1 || GetNumElements() == 0)
                     idx--;
             }
             else
