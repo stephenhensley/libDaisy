@@ -248,6 +248,9 @@ class SSD130xDriver
     struct Config
     {
         typename Transport::Config transport_config;
+        bool                       flipped;
+
+        Config() : flipped(false) {}
     };
 
     void Init(Config config)
@@ -302,7 +305,7 @@ class SSD130xDriver
                 transport_.SendCommand(0xDA);
                 transport_.SendCommand(0x12);
                 break;
-            default: // 128
+            default: // 64 (was previously marked as 128)
                 // Display Clock Divide Ratio
                 transport_.SendCommand(0xD5);
                 transport_.SendCommand(0x80);
@@ -327,10 +330,22 @@ class SSD130xDriver
         // Charge Pump
         transport_.SendCommand(0x8D);
         transport_.SendCommand(0x14);
-        // Set Segment Remap
-        transport_.SendCommand(0xA1);
-        // COM Output Scan Direction
-        transport_.SendCommand(0xC8);
+
+        // Set Segment Remap -- direction needs to invert when flipped
+        // otherwise graphics will appear mirrored.
+        if(config.flipped)
+            transport_.SendCommand(0xA0); // column 0
+        else
+            transport_.SendCommand(0xA1); // column 127
+
+        // Set COM Output Scan Direction:
+        // "...if this command is sent during normal
+        //  display then the graphic display will be vertically flipped immediately."
+        // this has been C8 as the default up to this point.
+        if(config.flipped)
+            transport_.SendCommand(0xC0);
+        else
+            transport_.SendCommand(0xC8);
         // Contrast Control
         transport_.SendCommand(0x81);
         transport_.SendCommand(0x8F);
@@ -340,7 +355,6 @@ class SSD130xDriver
         // VCOM Detect
         transport_.SendCommand(0xDB);
         transport_.SendCommand(0x34);
-
 
         // Display On
         transport_.SendCommand(0xAF); //--turn on oled panel
@@ -368,7 +382,7 @@ class SSD130xDriver
     };
 
     /**
-     * Update the display 
+     * Update the display
     */
     void Update()
     {
@@ -380,6 +394,7 @@ class SSD130xDriver
 
             default: high_column_addr = 0x10; break;
         }
+        high_column_addr = 0x10; //*< override for above so it works with my 32-pixel oled...
         for(i = 0; i < (height / 8); i++)
         {
             transport_.SendCommand(0xB0 + i);
@@ -395,64 +410,64 @@ class SSD130xDriver
 };
 
 /**
- * A driver for the SSD1306/SSD1309 128x64 OLED displays connected via 4 wire SPI  
+ * A driver for the SSD1306/SSD1309 128x64 OLED displays connected via 4 wire SPI
  */
 using SSD130x4WireSpi128x64Driver
     = daisy::SSD130xDriver<128, 64, SSD130x4WireSpiTransport>;
 
 /**
- * A driver for the SSD1306/SSD1309 128x32 OLED displays connected via 4 wire SPI  
+ * A driver for the SSD1306/SSD1309 128x32 OLED displays connected via 4 wire SPI
  */
 using SSD130x4WireSpi128x32Driver
     = daisy::SSD130xDriver<128, 32, SSD130x4WireSpiTransport>;
 
 /**
- * A driver for the SSD1306/SSD1309 98x16 OLED displays connected via 4 wire SPI  
+ * A driver for the SSD1306/SSD1309 98x16 OLED displays connected via 4 wire SPI
  */
 using SSD130x4WireSpi98x16Driver
     = daisy::SSD130xDriver<98, 16, SSD130x4WireSpiTransport>;
 
 /**
- * A driver for the SSD1306/SSD1309 64x48 OLED displays connected via 4 wire SPI  
+ * A driver for the SSD1306/SSD1309 64x48 OLED displays connected via 4 wire SPI
  */
 using SSD130x4WireSpi64x48Driver
     = daisy::SSD130xDriver<64, 48, SSD130x4WireSpiTransport>;
 
 /**
- * A driver for the SSD1306/SSD1309 64x32 OLED displays connected via 4 wire SPI  
+ * A driver for the SSD1306/SSD1309 64x32 OLED displays connected via 4 wire SPI
  */
 using SSD130x4WireSpi64x32Driver
     = daisy::SSD130xDriver<64, 32, SSD130x4WireSpiTransport>;
 
 /**
- * A driver for the SSD1306/SSD1309 128x64 OLED displays connected via I2C  
+ * A driver for the SSD1306/SSD1309 128x64 OLED displays connected via I2C
  */
 using SSD130xI2c128x64Driver
     = daisy::SSD130xDriver<128, 64, SSD130xI2CTransport>;
 
 /**
- * A driver for the SSD1306/SSD1309 128x32 OLED displays connected via I2C  
+ * A driver for the SSD1306/SSD1309 128x32 OLED displays connected via I2C
  */
 using SSD130xI2c128x32Driver
     = daisy::SSD130xDriver<128, 32, SSD130xI2CTransport>;
 
 /**
- * A driver for the SSD1306/SSD1309 98x16 OLED displays connected via I2C  
+ * A driver for the SSD1306/SSD1309 98x16 OLED displays connected via I2C
  */
 using SSD130xI2c98x16Driver = daisy::SSD130xDriver<98, 16, SSD130xI2CTransport>;
 
 /**
- * A driver for the SSD1306/SSD1309 64x48 OLED displays connected via I2C  
+ * A driver for the SSD1306/SSD1309 64x48 OLED displays connected via I2C
  */
 using SSD130xI2c64x48Driver = daisy::SSD130xDriver<64, 48, SSD130xI2CTransport>;
 
 /**
- * A driver for the SSD1306/SSD1309 64x32 OLED displays connected via I2C  
+ * A driver for the SSD1306/SSD1309 64x32 OLED displays connected via I2C
  */
 using SSD130xI2c64x32Driver = daisy::SSD130xDriver<64, 32, SSD130xI2CTransport>;
 
 /**
- * A driver for the SSD1306/SSD1309 128x64 OLED displays connected via 4 wire SPI  
+ * A driver for the SSD1306/SSD1309 128x64 OLED displays connected via 4 wire SPI
  */
 using SSD130x4WireSoftSpi128x64Driver
     = daisy::SSD130xDriver<128, 64, SSD130x4WireSoftSpiTransport>;
