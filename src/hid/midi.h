@@ -61,6 +61,7 @@ class MidiUartTransport
     /** @brief Initialization of UART using config struct */
     inline void Init(Config config)
     {
+        cfg_ = config;
         UartHandler::Config uart_config;
 
         //defaults
@@ -111,6 +112,7 @@ class MidiUartTransport
     size_t              rx_buffer_size;
     void*               parse_context_;
     MidiRxParseCallback parse_callback_;
+    Config              cfg_;
 
     /** Static callback for Uart MIDI that occurs when
          *  new data is available from the peripheral.
@@ -136,6 +138,13 @@ class MidiUartTransport
                 transport->parse_callback_(
                     data, size, transport->parse_context_);
             }
+        }
+        else
+        {
+            /** Error */
+            auto current_cfg = transport->cfg_;
+            /** Reinitialize for recovery */
+            transport->Init(current_cfg);
         }
     }
 };
