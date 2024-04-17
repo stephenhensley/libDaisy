@@ -23,8 +23,14 @@ namespace daisy
 class Color
 {
   public:
-    Color() {}
+    /** Basic constructor of off/black-color */
+    Color() : red_(0.f), green_(0.f), blue_(0.f) {}
+
+    /** Constructor with each RGB */
+    Color(float r, float g, float b) : red_(r), green_(g), blue_(b) {}
+
     ~Color() {}
+
     /** List of colors that have a preset RGB value */
     enum PresetColor
     {
@@ -67,6 +73,18 @@ class Color
         Color c;
         c.Init(red_ * scale, green_ * scale, blue_ * scale);
         return c;
+    }
+
+    /** Returns a color that is blended between a and b */
+    static Color Blend(const Color a, const Color b, const float amt)
+    {
+        float scalar = amt > 1.f ? 1.f : amt < 0.f ? 0.f : amt;
+        float nr = a.Red() + (b.Red() - a.Red()) * scalar;
+        float ng = a.Green() + (b.Green() - a.Green()) * scalar;
+        float nb = a.Blue() + (b.Blue() - a.Blue()) * scalar;
+
+        Color new_color(nr, ng, nb);
+        return new_color;
     }
 
   private:
