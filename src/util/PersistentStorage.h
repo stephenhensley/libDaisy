@@ -8,30 +8,30 @@ namespace daisy
 {
 /** @brief Non Volatile storage class for persistent settings on an external flash device.
  *  @author shensley
- * 
- *  Storage occupied by the struct will be one word larger than 
+ *
+ *  Storage occupied by the struct will be one word larger than
  *  the SettingStruct used. The extra word is used to store the
  *  state of the data, and whether it's been overwritten or not.
- * 
+ *
  *  \todo - Make Save() non-blocking
  *  \todo - Add wear leveling
- * 
+ *
  **/
 template <typename SettingStruct>
 class PersistentStorage
 {
   public:
-    /** State of the storage. 
+    /** State of the storage.
      *  When created, prior to initialiation, the state will be Unknown
-     *  
+     *
      *  During initialization, the state will be changed to either FACTORY,
-     *  or USER. 
-     * 
+     *  or USER.
+     *
      *  If this is the first time these settings are being written to the
      *  target address, the defaults will be written to that location,
      *  and the state will be set to FACTORY.
-     * 
-     *  Once the first user-trigger save has been made, the state will be 
+     *
+     *  Once the first user-trigger save has been made, the state will be
      *  updated to USER to indicate that the defaults have overwritten.
      */
     enum class State
@@ -41,7 +41,7 @@ class PersistentStorage
         USER    = 2,
     };
 
-    /** Constructor for storage class 
+    /** Constructor for storage class
      *  \param qspi reference to the hardware qspi peripheral.
      */
     PersistentStorage(QSPIHandle &qspi)
@@ -93,10 +93,10 @@ class PersistentStorage
     SettingStruct &GetSettings() { return settings_; }
 
     /** Performs the save operation, storing the storage */
-    void Save()
+    bool Save()
     {
         state_ = State::USER;
-        StoreSettingsIfChanged();
+        return StoreSettingsIfChanged();
     }
 
     /** Restores the settings stored in the QSPI */
@@ -114,7 +114,7 @@ class PersistentStorage
         SettingStruct user_data;
     };
 
-    void StoreSettingsIfChanged()
+    bool StoreSettingsIfChanged()
     {
         SaveStruct s;
         s.storage_state = state_;
@@ -126,11 +126,11 @@ class PersistentStorage
         // Caching behavior is different when running programs outside internal flash
         // so we need to explicitly invalidate the QSPI mapped memory to ensure we are
         // comparing the local settings with the most recently persisted settings.
-        if(System::GetProgramMemoryRegion()
-           != System::MemoryRegion::INTERNAL_FLASH)
-        {
+        // if(System::GetProgramMemoryRegion()
+        //    != System::MemoryRegion::INTERNAL_FLASH)
+        // {
             dsy_dma_invalidate_cache_for_buffer((uint8_t *)data_ptr, sizeof(s));
-        }
+        // }
 #endif
 
         // Only actually save if the new data is different
@@ -141,7 +141,9 @@ class PersistentStorage
         {
             qspi_.Erase(address_offset_, address_offset_ + sizeof(s));
             qspi_.Write(address_offset_, sizeof(s), (uint8_t *)&s);
+            return true;
         }
+        return false;
     }
 
     QSPIHandle &  qspi_;
