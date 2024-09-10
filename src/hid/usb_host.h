@@ -1,8 +1,7 @@
-#ifndef USB_HOST_H
-#define USB_HOST_H
+#ifndef DSY_MSD
+#define DSY_MSD
 
 #include <cstdint>
-#include "usbh_def.h"
 
 namespace daisy
 {
@@ -40,7 +39,7 @@ class USBHostHandle
         FAIL,
         NOT_SUPPORTED,
         UNRECOVERED_ERROR,
-        ERROR_SPEED_UNKNOWN
+        ERROR_SPEED_UNKNOWN,
     };
 
     /** @brief User defineable callback for USB Connection */
@@ -50,7 +49,7 @@ class USBHostHandle
     typedef void (*DisconnectCallback)(void* data);
 
     /** @brief User defineable callback upon completion of class initialization 
-     *  For example, when a USB drive is connected and the usb device class
+     *  For example, when a USB drive is connected and the mass storage class 
      *  initialization has finished, this callback will fire.
      * 
      *  @param userdata a pointer to some arbitrary data for use by the user.
@@ -67,7 +66,7 @@ class USBHostHandle
     */
     typedef void (*ErrorCallback)(void* data);
 
-    /** @brief Configuration structure for interfacing with USB host Driver */
+    /** @brief Configuration structure for interfacing with MSD Driver */
     struct Config
     {
         Config()
@@ -85,26 +84,16 @@ class USBHostHandle
         void*               userdata;
     };
 
-    /**
-     * Register a USB class
-     */
-    Result RegisterClass(USBH_ClassTypeDef* pClass);
-
     /** Initializes the USB drivers and starts timeout.
      * 
      *  \param config Configuration struct for initialization
      */
-    Result Init(USBHostHandle::Config& config);
+    Result Init(Config config);
 
-    /** Deinitializes USB host-related peripherals
+    /** Deinitializes MSD-related peripherals
      * 
      */
     Result Deinit();
-
-    /**
-     * Returns true if the specified class is active
-     */
-    bool IsActiveClass(USBH_ClassTypeDef* usbClass);
 
     /** Manages usb host functionality
      * 
@@ -126,12 +115,14 @@ class USBHostHandle
      */
     bool GetPresent();
 
-    /** Returns name of the connected devices if there is one
-     */
-    const char* GetProductName();
+    /** @brief Returns if the HAL detects that the port is enabled */
+    bool IsPortEnabled();
+
+    /** @brief Returns if the ST Middleware detects a connected device */
+    bool IsDeviceConnected();
 
     USBHostHandle() : pimpl_(nullptr) {}
-    USBHostHandle(const USBHostHandle& other) = default;
+    USBHostHandle(const USBHostHandle& other)            = default;
     USBHostHandle& operator=(const USBHostHandle& other) = default;
 
     class Impl; /**< & */

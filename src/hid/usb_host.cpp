@@ -1,25 +1,15 @@
 
-#include <stdlib.h>
 #include "usb_host.h"
 #include "daisy_core.h"
 #include "usbh_core.h"
 #include "usbh_msc.h"
-#include "logger.h"
 
 using namespace daisy;
 
 extern "C"
 {
+    extern HCD_HandleTypeDef                  hhcd_USB_OTG_HS;
     USBH_HandleTypeDef DMA_BUFFER_MEM_SECTION hUsbHostHS;
-    void USBH_LogPrint(const char* format, ...);
-}
-
-void USBH_LogPrint(const char* format, ...)
-{
-    va_list va;
-    va_start(va, format);
-    Logger<LOGGER_INTERNAL>::PrintLineV(format, va);
-    va_end(va);
 }
 
 ApplicationTypeDef Appli_state = APPLICATION_IDLE;
@@ -27,19 +17,20 @@ ApplicationTypeDef Appli_state = APPLICATION_IDLE;
 class USBHostHandle::Impl
 {
   public:
-    Impl() { memset(&hUsbHostHS, 0, sizeof(hUsbHostHS)); }
+    Impl() {}
     ~Impl() {}
 
-    Result RegisterClass(USBH_ClassTypeDef* pClass);
-    Result Init(USBHostHandle::Config& config);
+    Result Init(Config config);
     Result Deinit();
-    Result Reinit();
     Result Process();
     Result ReEnumerate();
 
+    bool IsPortEnabled();
+    bool IsDeviceConnected();
+
     bool GetReady();
 
-    inline Config& GetConfig() { return config_; }
+    inline Config &GetConfig() { return config_; }
 
   private:
     Config config_;
@@ -64,40 +55,32 @@ class USBHostHandle::Impl
     }
 };
 
-// Global handle
-static USBHostHandle::Impl usbh_impl;
+// Global dfu handle
+USBHostHandle::Impl msd_impl;
 
-static void USBH_UserProcess(USBH_HandleTypeDef* phost, uint8_t id);
+static void USBH_UserProcess(USBH_HandleTypeDef *phost, uint8_t id);
 
-USBHostHandle::Result
-USBHostHandle::Impl::RegisterClass(USBH_ClassTypeDef* pClass)
+USBHostHandle::Result USBHostHandle::Impl::Init(USBHostHandle::Config config)
 {
-    return ConvertStatus(USBH_RegisterClass(&hUsbHostHS, pClass));
-}
-
-USBHostHandle::Result USBHostHandle::Impl::Init(USBHostHandle::Config& config)
-{
-    /* Copy in configuration */
     config_ = config;
-
     /* Init host Library, add supported class and start the library. */
     USBH_StatusTypeDef sta;
-
     sta = USBH_Init(&hUsbHostHS, USBH_UserProcess, HOST_HS);
-    if(sta == USBH_OK)
-        sta = USBH_Start(&hUsbHostHS);
-
+    if(sta != USBH_OK)
+    {
+        return ConvertStatus(sta);
+    }
+    sta = USBH_RegisterClass(&hUsbHostHS, USBH_MSC_CLASS);
+    if(sta != USBH_OK)
+    {
+        return ConvertStatus(sta);
+    }
+    sta = USBH_Start(&hUsbHostHS);
+    if(sta != USBH_OK)
+    {
+        return ConvertStatus(sta);
+    }
     return ConvertStatus(sta);
-}
-
-USBHostHandle::Result USBHostHandle::Impl::Reinit()
-{
-    uint32_t numClasses = hUsbHostHS.ClassNumber;
-    Deinit();
-    USBHostHandle::Result result = Init(config_);
-    // Restore registered class count
-    hUsbHostHS.ClassNumber = numClasses;
-    return result;
 }
 
 USBHostHandle::Result USBHostHandle::Impl::Deinit()
@@ -109,12 +92,7 @@ USBHostHandle::Result USBHostHandle::Impl::Deinit()
 
 USBHostHandle::Result USBHostHandle::Impl::Process()
 {
-    // The USBH state machine seems to get wedged in the
-    // abort state, re-initialize to try and clear it.
-    if(hUsbHostHS.gState == HOST_ABORT_STATE)
-        return Reinit();
-    else
-        return ConvertStatus(USBH_Process(&hUsbHostHS));
+    return ConvertStatus(USBH_Process(&hUsbHostHS));
 }
 
 USBHostHandle::Result USBHostHandle::Impl::ReEnumerate()
@@ -124,17 +102,24 @@ USBHostHandle::Result USBHostHandle::Impl::ReEnumerate()
 
 bool USBHostHandle::Impl::GetReady()
 {
-    return Appli_state == APPLICATION_READY;
+    return (bool)USBH_MSC_IsReady(&hUsbHostHS);
 }
 
-USBHostHandle::Result USBHostHandle::RegisterClass(USBH_ClassTypeDef* pClass)
+bool USBHostHandle::Impl::IsPortEnabled()
 {
-    return pimpl_->RegisterClass(pClass);
+    return USBH_IsPortEnabled(&hUsbHostHS);
 }
 
-USBHostHandle::Result USBHostHandle::Init(Config& config)
+bool USBHostHandle::Impl::IsDeviceConnected()
 {
-    pimpl_ = &usbh_impl;
+    return hUsbHostHS.device.is_connected;
+}
+
+// MSDHandle -> Impl
+
+USBHostHandle::Result USBHostHandle::Init(Config config)
+{
+    pimpl_ = &msd_impl;
     return pimpl_->Init(config);
 }
 
@@ -158,11 +143,6 @@ USBHostHandle::Result USBHostHandle::ReEnumerate()
     return pimpl_->ReEnumerate();
 }
 
-bool USBHostHandle::IsActiveClass(USBH_ClassTypeDef* pClass)
-{
-    return pClass == hUsbHostHS.pActiveClass;
-}
-
 bool USBHostHandle::GetPresent()
 {
     auto state = hUsbHostHS.gState;
@@ -170,12 +150,22 @@ bool USBHostHandle::GetPresent()
             && state != HOST_DEV_DISCONNECTED);
 }
 
-// Shared USB IRQ Handlers are located in sys/System.cpps
+bool USBHostHandle::IsPortEnabled()
+{
+    return pimpl_->IsPortEnabled();
+}
+
+bool USBHostHandle::IsDeviceConnected()
+{
+    return pimpl_->IsDeviceConnected();
+}
+
+// Shared USB IRQ Handlers are located in sys/System.cpp
 
 // This isn't super useful for our typical code structure
-static void USBH_UserProcess(USBH_HandleTypeDef* phost, uint8_t id)
+static void USBH_UserProcess(USBH_HandleTypeDef *phost, uint8_t id)
 {
-    auto& conf = usbh_impl.GetConfig();
+    auto &conf = msd_impl.GetConfig();
     switch(id)
     {
         case HOST_USER_SELECT_CONFIGURATION: break;
