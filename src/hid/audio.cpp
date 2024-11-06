@@ -1,3 +1,4 @@
+#include <algorithm>
 #include "hid/audio.h"
 
 namespace daisy
@@ -31,7 +32,7 @@ class AudioHandle::Impl
     // Interface
     AudioHandle::Result Init(const AudioHandle::Config config, SaiHandle sai);
     AudioHandle::Result
-                        Init(const AudioHandle::Config config, SaiHandle sai1, SaiHandle sai2);
+    Init(const AudioHandle::Config config, SaiHandle sai1, SaiHandle sai2);
     AudioHandle::Result DeInit();
     AudioHandle::Result Start(AudioHandle::AudioCallback callback);
     AudioHandle::Result Start(AudioHandle::InterleavingAudioCallback callback);
@@ -129,6 +130,21 @@ AudioHandle::Result AudioHandle::Impl::Init(const AudioHandle::Config config,
     {
         return Result::ERR;
     }
+
+    /** Zero the raw DMA buffers to ensure predictable state/silence on startup
+     *  regardless of startup conditions in the Reset Handler
+     */
+    for(size_t i = 0; i < kAudioMaxChannels / 2; i++)
+    {
+        std::fill(dsy_audio_rx_buffer[i],
+                  dsy_audio_rx_buffer[i] + kAudioMaxBufferSize,
+                  0);
+        std::fill(dsy_audio_tx_buffer[i],
+                  dsy_audio_tx_buffer[i] + kAudioMaxBufferSize,
+                  0);
+    }
+
+
     buff_rx_[0] = dsy_audio_rx_buffer[0];
     buff_tx_[0] = dsy_audio_tx_buffer[0];
     return Result::OK;
