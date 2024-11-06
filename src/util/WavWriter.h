@@ -5,11 +5,11 @@
 namespace daisy
 {
 /** Audio Recording Module
- ** 
- ** Record audio into a working buffer that is gradually written to a WAV file on an SD Card. 
  **
- ** Recordings are made with floating point input, and will be converted to the 
- ** specified bits per sample internally 
+ ** Record audio into a working buffer that is gradually written to a WAV file on an SD Card.
+ **
+ ** Recordings are made with floating point input, and will be converted to the
+ ** specified bits per sample internally
  **
  ** For now only 16-bit and 32-bit (signed int) formats are supported
  ** f32 and s24 formats will be added next
@@ -18,7 +18,7 @@ namespace daisy
  ** effect on the performance of the streaming behavior of the WavWriter.
  ** Memory use can be calculated as: (2 * transfer_size) bytes
  ** Performance optimal with sizes: 16384, 32768
- ** 
+ **
  ** To use:
  ** 1. Create a WavWriter<size> object (e.g. WavWriter<32768> writer)
  ** 2. Configure the settings as desired by creating a WavWriter<32768>::Config struct and setting the settings.
@@ -27,7 +27,7 @@ namespace daisy
  ** 5. Write to it within your audio callback using: writer.Sample(value)
  ** 6. Fill the Wav File on the SD Card with data from your main loop by running: writer.Write()
  ** 7. When finished with the recording finalize, and close the file with: writer.SaveFile();
- ** 
+ **
  ** */
 template <size_t transfer_size>
 class WavWriter
@@ -47,12 +47,21 @@ class WavWriter
      ** */
     struct Config
     {
-        float   samplerate;
-        int32_t channels;
-        int32_t bitspersample;
+        float             samplerate;
+        int32_t           channels;
+        int32_t           bitspersample;
+        WavFileFormatCode format;
+
+        Config()
+        : samplerate(48000.0f),
+          channels(2),
+          bitspersample(16),
+          format(WAVE_FORMAT_PCM)
+        {
+        }
     };
 
-    /** State of the internal Writing mechanism. 
+    /** State of the internal Writing mechanism.
      ** When the buffer is a certain amount full one section will write its contents
      ** while the other is still being written to. This is performed circularly
      ** so that audio will be uninterrupted during writing. */
@@ -74,9 +83,9 @@ class WavWriter
         wavheader_.FileFormat    = kWavFileWaveId;      /** "WAVE" */
         wavheader_.SubChunk1ID   = kWavFileSubChunk1Id; /** "fmt " */
         wavheader_.SubChunk1Size = 16;                  // for PCM
-        wavheader_.AudioFormat   = WAVE_FORMAT_PCM;
-        wavheader_.NbrChannels   = cfg.channels;
-        wavheader_.SampleRate    = static_cast<int>(cfg.samplerate);
+        wavheader_.AudioFormat   = cfg_.format;
+        wavheader_.NbrChannels   = cfg_.channels;
+        wavheader_.SampleRate    = static_cast<int>(cfg_.samplerate);
         wavheader_.ByteRate      = CalcByteRate();
         wavheader_.BlockAlign    = cfg_.channels * cfg_.bitspersample / 8;
         wavheader_.BitPerSample  = cfg_.bitspersample;
@@ -87,12 +96,12 @@ class WavWriter
     }
 
     /** Records the current sample into the working buffer,
-     ** queues writes to media when necessary. 
-     ** 
+     ** queues writes to media when necessary.
+     **
      ** \param in should be a pointer to an array of samples */
     void Sample(const float *in)
     {
-        for(size_t i = 0; i < cfg_.channels; i++)
+        for(int i = 0; i < cfg_.channels; i++)
         {
             switch(cfg_.bitspersample)
             {
@@ -103,7 +112,17 @@ class WavWriter
                     tp[wptr_ + i] = f2s16(in[i]);
                 }
                 break;
-                case 32: transfer_buff[wptr_ + i] = f2s32(in[i]); break;
+                case 32:
+                    if(cfg_.format == WAVE_FORMAT_IEEE_FLOAT)
+                    {
+                        float *tp = reinterpret_cast<float *>(transfer_buff);
+                        tp[wptr_ + i] = in[i];
+                    }
+                    else
+                    {
+                        transfer_buff[wptr_ + i] = f2s32(in[i]);
+                    }
+                    break;
                 default: break;
             }
         }
@@ -120,6 +139,15 @@ class WavWriter
             wptr_   = 0;
             bstate_ = BufferState::FLUSH1;
         }
+    }
+
+    /** This is only for stereo files that are not interleaved
+     *  It saves an external step of having to reintegrate the
+     *  cahnnels into a single buffer before writing. */
+    void SampleDiscreteChannels(float left, float right)
+    {
+        float in[2] = {left, right};
+        Sample(in);
     }
 
     /** Check buffer state and write */
