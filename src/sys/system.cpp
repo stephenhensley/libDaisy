@@ -16,8 +16,8 @@ extern "C"
 }
 
 // boot info struct declared in persistent backup SRAM
-volatile daisy::System::BootInfo __attribute__((section(".backup_sram")))
-daisy::boot_info;
+volatile daisy::System::BootInfo
+    __attribute__((section(".backup_sram"))) daisy::boot_info;
 
 // Jump related stuff
 #define u32 uint32_t
@@ -41,7 +41,8 @@ daisy::boot_info;
 #define STK_CTRL (STK + 0x00)
 #define RCC_CR RCC
 
-#define SDRAM_BASE 0xC0000000
+#define SDRAM_BASE 0x60000000
+//#define SDRAM_BASE 0xC0000000
 
 #define INTERNAL_FLASH_SIZE 0x20000
 #define ITCMRAM_SIZE 0x10000
@@ -542,7 +543,8 @@ void System::ConfigureMpu()
     MPU_InitStruct.Number       = MPU_REGION_NUMBER1;
     MPU_InitStruct.TypeExtField = MPU_TEX_LEVEL0;
     MPU_InitStruct.Size         = MPU_REGION_SIZE_64MB;
-    MPU_InitStruct.BaseAddress  = 0xC0000000;
+    //MPU_InitStruct.BaseAddress  = 0xC0000000;
+    MPU_InitStruct.BaseAddress = SDRAM_BASE;
     HAL_MPU_ConfigRegion(&MPU_InitStruct);
 
     // Configure the backup SRAM region as non-cacheable

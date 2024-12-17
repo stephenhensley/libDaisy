@@ -105,6 +105,9 @@ SdramHandle::Result SdramHandle::PeriphInit()
         //Error_Handler();
         return Result::ERR;
     }
+
+    HAL_SetFMCMemorySwappingConfig(FMC_SWAPBMAP_SDRAM_SRAM);
+
     return Result::OK;
 }
 
@@ -208,7 +211,7 @@ static void HAL_FMC_MspInit(void)
     __HAL_RCC_GPIOC_CLK_ENABLE();
 
 
-    /** FMC GPIO Configuration  
+    /** FMC GPIO Configuration
     PE1   ------> FMC_NBL1
     PE0   ------> FMC_NBL0
     PG15   ------> FMC_SDNCAS
@@ -372,7 +375,7 @@ static void HAL_FMC_MspDeInit(void)
     /* Peripheral clock enable */
     __HAL_RCC_FMC_CLK_DISABLE();
 
-    /** FMC GPIO Configuration  
+    /** FMC GPIO Configuration
     PE1   ------> FMC_NBL1
     PE0   ------> FMC_NBL0
     PG15   ------> FMC_SDNCAS
