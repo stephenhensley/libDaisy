@@ -72,7 +72,7 @@ class Color
     inline void SetBlue(const float amt) { blue_ = amt; }
 
     /** Returns a scaled color by a float */
-    Color operator*(float scale)
+    Color operator*(float scale) const
     {
         Color c;
         c.Init(red_ * scale, green_ * scale, blue_ * scale);
@@ -80,7 +80,7 @@ class Color
     }
 
     /** Adds another color to this one, destructively saturating at 1 */
-    Color operator+(Color rhs)
+    Color operator+(Color rhs) const
     {
         float r_ = red_ + rhs.Red();
         float g_ = green_ + rhs.Green();
