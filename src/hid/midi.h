@@ -105,6 +105,9 @@ class MidiUartTransport
     /** @brief sends the buffer of bytes out of the UART peripheral */
     inline void Tx(uint8_t* buff, size_t size) { uart_.PollTx(buff, size); }
 
+    /** @brief Hacked in access to UART peripheral to allow more complex Tx configurations.. */
+    inline UartHandler& GetUartHandle() { return uart_; }
+
   private:
     UartHandler         uart_;
     uint8_t*            rx_buffer;
@@ -225,6 +228,9 @@ class MidiHandler
             event_q_.PushBack(event);
         }
     }
+
+    /** Hacked in to allow access for more complex Tx interactions.. */
+    Transport& GetMutableTransport() { return transport_; }
 
   private:
     Config               config_;
