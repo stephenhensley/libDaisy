@@ -111,7 +111,7 @@ static int get_num_mux_pins_required(int num_mux_ch)
         return 0;
 }
 static void
-                      write_mux_value(uint8_t chn, uint8_t idx, uint8_t num_mux_pins_to_write);
+write_mux_value(uint8_t chn, uint8_t idx, uint8_t num_mux_pins_to_write);
 static const uint32_t adc_channel_from_pin(Pin pin);
 
 static const uint32_t adc_channel_from_pin(Pin pin)
@@ -380,6 +380,12 @@ void AdcHandle::Init(AdcChannelConfig* cfg,
     }
 }
 
+void AdcHandle::DeInit()
+{
+    Stop();
+    HAL_ADC_DeInit(&adc.hadc1);
+}
+
 void AdcHandle::Start()
 {
     HAL_ADCEx_Calibration_Start(
@@ -534,7 +540,10 @@ void HAL_ADC_MspDeInit(ADC_HandleTypeDef* adcHandle)
 
 extern "C"
 {
-    void DMA1_Stream2_IRQHandler(void) { HAL_DMA_IRQHandler(&adc.hdma_adc1); }
+    void DMA1_Stream2_IRQHandler(void)
+    {
+        HAL_DMA_IRQHandler(&adc.hdma_adc1);
+    }
 
     void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
     {
