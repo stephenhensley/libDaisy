@@ -300,6 +300,15 @@ void DaisySeed::ConfigureAudio()
             deemp.Write(0);
         }
         break;
+        case BoardVersion::DAISY_SEED_3:
+        {
+            // Data Line Directions
+            sai_config.a_dir         = SaiHandle::Config::Direction::RECEIVE;
+            sai_config.pin_config.sa = Pin(PORTE, 6);
+            sai_config.b_dir         = SaiHandle::Config::Direction::TRANSMIT;
+            sai_config.pin_config.sb = Pin(PORTE, 3);
+        }
+        break;
         case BoardVersion::DAISY_SEED:
         default:
         {
@@ -347,14 +356,17 @@ DaisySeed::BoardVersion DaisySeed::CheckBoardVersion()
      */
 
     /** Initialize GPIO */
-    GPIO s2dfm_gpio, seed_1_1_gpio;
+    GPIO s2dfm_gpio, seed_1_1_gpio, s3_gpio;
     Pin  seed_1_1_pin(PORTD, 3);
     Pin  s2dfm_pin(PORTD, 4);
     seed_1_1_gpio.Init(seed_1_1_pin, GPIO::Mode::INPUT, GPIO::Pull::PULLUP);
     s2dfm_gpio.Init(s2dfm_pin, GPIO::Mode::INPUT, GPIO::Pull::PULLUP);
+    s3_gpio.Init(Pin(PORTH, 6), GPIO::Mode::INPUT, GPIO::Pull::PULLUP);
 
     /** Perform Check */
-    if(!seed_1_1_gpio.Read())
+    if(!s3_gpio.Read())
+        return BoardVersion::DAISY_SEED_3;
+    else if(!seed_1_1_gpio.Read())
         return BoardVersion::DAISY_SEED_1_1;
     else if(!s2dfm_gpio.Read())
         return BoardVersion::DAISY_SEED_2_DFM;
