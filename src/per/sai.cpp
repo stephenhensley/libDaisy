@@ -39,6 +39,9 @@ class SaiHandle::Impl
     /** Offset stored for weird inter-SAI stuff.*/
     size_t dma_offset;
 
+    /** Flags for pending pause, and resume states */
+    bool pending_pause_flag_, pending_resume_flag_;
+
     /** Callback that dispatches user callback from Cplt and HalfCplt DMA Callbacks */
     void InternalCallback(size_t offset);
 
@@ -226,10 +229,10 @@ void SaiHandle::Impl::InitDma(PeripheralBlock block)
         hsai = &sai_a_handle_;
         hdma = &sai_a_dma_handle_;
         dir  = config_.a_dir == Config::Direction::RECEIVE
-                  ? DMA_PERIPH_TO_MEMORY
-                  : DMA_MEMORY_TO_PERIPH;
-        req = sai_idx == int(Config::Peripheral::SAI_1) ? DMA_REQUEST_SAI1_A
-                                                        : DMA_REQUEST_SAI2_A;
+                   ? DMA_PERIPH_TO_MEMORY
+                   : DMA_MEMORY_TO_PERIPH;
+        req  = sai_idx == int(Config::Peripheral::SAI_1) ? DMA_REQUEST_SAI1_A
+                                                         : DMA_REQUEST_SAI2_A;
 
         if(sai_idx == int(Config::Peripheral::SAI_1))
             hdma->Instance = DMA1_Stream0;
@@ -241,10 +244,10 @@ void SaiHandle::Impl::InitDma(PeripheralBlock block)
         hsai = &sai_b_handle_;
         hdma = &sai_b_dma_handle_;
         dir  = config_.b_dir == Config::Direction::RECEIVE
-                  ? DMA_PERIPH_TO_MEMORY
-                  : DMA_MEMORY_TO_PERIPH;
-        req = sai_idx == int(Config::Peripheral::SAI_1) ? DMA_REQUEST_SAI1_B
-                                                        : DMA_REQUEST_SAI2_B;
+                   ? DMA_PERIPH_TO_MEMORY
+                   : DMA_MEMORY_TO_PERIPH;
+        req  = sai_idx == int(Config::Peripheral::SAI_1) ? DMA_REQUEST_SAI1_B
+                                                         : DMA_REQUEST_SAI2_B;
 
         if(sai_idx == int(Config::Peripheral::SAI_1))
             hdma->Instance = DMA1_Stream1;
@@ -361,10 +364,10 @@ void SaiHandle::Impl::InitPins()
     GPIO_InitTypeDef GPIO_InitStruct;
     GPIO_TypeDef*    port;
     Pin              cfg[] = {config_.pin_config.fs,
-                 config_.pin_config.mclk,
-                 config_.pin_config.sck,
-                 config_.pin_config.sa,
-                 config_.pin_config.sb};
+                              config_.pin_config.mclk,
+                              config_.pin_config.sck,
+                              config_.pin_config.sa,
+                              config_.pin_config.sb};
     // Special Case checks
     Pin sck_af_pin = Pin(PORTA, 2);
     is_master      = (config_.a_sync == Config::Sync::MASTER
@@ -501,30 +504,22 @@ extern "C" void DMA1_Stream4_IRQHandler(void)
 
 extern "C" void HAL_SAI_RxHalfCpltCallback(SAI_HandleTypeDef* hsai)
 {
-    if(hsai->Instance == SAI1_Block_A || hsai->Instance == SAI1_Block_B)
-    {
-        sai_handles[0].dma_offset = 0;
-        sai_handles[0].InternalCallback(0);
-    }
-    else if(hsai->Instance == SAI2_Block_A || hsai->Instance == SAI2_Block_B)
-    {
-        sai_handles[1].dma_offset = 0;
-        sai_handles[1].InternalCallback(0);
-    }
+    SaiHandle::Impl* dsy_sai
+        = (hsai->Instance == SAI1_Block_A || hsai->Instance == SAI1_Block_B)
+              ? &sai_handles[0]
+              : &sai_handles[1];
+    dsy_sai->dma_offset = 0;
+    dsy_sai->InternalCallback(dsy_sai->dma_offset);
 }
 
 extern "C" void HAL_SAI_RxCpltCallback(SAI_HandleTypeDef* hsai)
 {
-    if(hsai->Instance == SAI1_Block_A || hsai->Instance == SAI1_Block_B)
-    {
-        sai_handles[0].dma_offset = sai_handles[0].buff_size_ / 2;
-        sai_handles[0].InternalCallback(sai_handles[0].dma_offset);
-    }
-    else if(hsai->Instance == SAI2_Block_A || hsai->Instance == SAI2_Block_B)
-    {
-        sai_handles[1].dma_offset = sai_handles[1].buff_size_ / 2;
-        sai_handles[1].InternalCallback(sai_handles[1].dma_offset);
-    }
+    SaiHandle::Impl* dsy_sai
+        = (hsai->Instance == SAI1_Block_A || hsai->Instance == SAI1_Block_B)
+              ? &sai_handles[0]
+              : &sai_handles[1];
+    dsy_sai->dma_offset = dsy_sai->buff_size_ / 2;
+    dsy_sai->InternalCallback(dsy_sai->dma_offset);
 }
 
 // ================================================================
