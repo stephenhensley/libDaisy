@@ -40,6 +40,7 @@ class AudioHandle::Impl
     AudioHandle::Result ChangeCallback(AudioHandle::AudioCallback callback);
     AudioHandle::Result
     ChangeCallback(AudioHandle::InterleavingAudioCallback callback);
+    AudioHandle::Result ClearCallback();
 
     inline size_t GetChannels() const
     {
@@ -251,6 +252,13 @@ AudioHandle::Result AudioHandle::Impl::ChangeCallback(
     {
         return Result::ERR;
     }
+}
+
+AudioHandle::Result AudioHandle::Impl::ClearCallback()
+{
+    interleaved_callback_ = nullptr;
+    callback_             = nullptr;
+    return Result::OK;
 }
 
 AudioHandle::Result
@@ -571,6 +579,11 @@ AudioHandle::Result
 AudioHandle::ChangeCallback(InterleavingAudioCallback callback)
 {
     return pimpl_->ChangeCallback(callback);
+}
+
+AudioHandle::Result AudioHandle::ClearCallback()
+{
+    return pimpl_->ClearCallback();
 }
 
 AudioHandle::Result AudioHandle::SetPostGain(float val)

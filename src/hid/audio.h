@@ -6,9 +6,9 @@
 namespace daisy
 {
 /** @brief Audio Engine Handle
- *  @ingroup audio 
+ *  @ingroup audio
  *  @details This class allows for higher level access to an audio engine.
- *           If you're using a SOM like the DaisySeed or DaisyPatchSM (or any 
+ *           If you're using a SOM like the DaisySeed or DaisyPatchSM (or any
  *            board that includes one of those objects) then the intialization
  *            is already taken  care of.
  *           If you're setting up your own custom hardware, or need to make changes
@@ -49,17 +49,17 @@ class AudioHandle
     };
 
     /** Non-Interleaving input buffer
-     * Buffer arranged by float[chn][sample] 
+     * Buffer arranged by float[chn][sample]
      * const so that the user can't modify the input
      */
     typedef const float* const* InputBuffer;
 
     /** Non-Interleaving output buffer
-     * Arranged by float[chn][sample] 
+     * Arranged by float[chn][sample]
      */
     typedef float** OutputBuffer;
 
-    /** Type for a Non-Interleaving audio callback 
+    /** Type for a Non-Interleaving audio callback
      * Non-Interleaving audio callbacks in daisy will be of this type
      */
     typedef void (*AudioCallback)(InputBuffer  in,
@@ -72,12 +72,12 @@ class AudioHandle
     */
     typedef const float* InterleavingInputBuffer;
 
-    /** Interleaving Output buffer 
+    /** Interleaving Output buffer
      ** audio is prepared as { L0, R0, L1, R1, . . . LN, RN }
     */
     typedef float* InterleavingOutputBuffer;
 
-    /** Interleaving Audio Callback 
+    /** Interleaving Audio Callback
      * Interleaving audio callbacks in daisy must be of this type
      */
     typedef void (*InterleavingAudioCallback)(InterleavingInputBuffer  in,
@@ -87,7 +87,7 @@ class AudioHandle
     AudioHandle() : pimpl_(nullptr) {}
     ~AudioHandle() {}
 
-    AudioHandle(const AudioHandle& other) = default;
+    AudioHandle(const AudioHandle& other)            = default;
     AudioHandle& operator=(const AudioHandle& other) = default;
 
     /** Initializes audio to run using a single SAI configured in Stereo I2S mode. */
@@ -102,7 +102,7 @@ class AudioHandle
     /** Returns the Global Configuration struct for the Audio */
     const Config& GetConfig() const;
 
-    /** Returns the number of channels of audio.  
+    /** Returns the number of channels of audio.
      **
      ** When using a single SAI this returns 2, when using two SAI it returns 4
      ** If no SAI is initialized this returns 0
@@ -118,13 +118,13 @@ class AudioHandle
     Result SetSampleRate(SaiHandle::Config::SampleRate samplerate);
 
     /** Sets the block size after initialization, and updates the internal configuration struct.
-     ** Get BlockSize and other details via the GetConfig 
+     ** Get BlockSize and other details via the GetConfig
      */
     Result SetBlockSize(size_t size);
 
     /** Sets the amount of gain adjustment to perform before and after callback.
-     ** useful if the hardware has additional headroom, and the nominal value shouldn't be 1.0 
-     ** 
+     ** useful if the hardware has additional headroom, and the nominal value shouldn't be 1.0
+     **
      ** \param val Gain adjustment amount. The hardware will clip at the reciprical of this value. */
     Result SetPostGain(float val);
 
@@ -139,8 +139,8 @@ class AudioHandle
     /** Starts the Audio using the non-interleaving callback. */
     Result Start(AudioCallback callback);
 
-    /** Starts the Audio using the interleaving callback. 
-     ** For now only two channels are supported via this method. 
+    /** Starts the Audio using the interleaving callback.
+     ** For now only two channels are supported via this method.
      */
     Result Start(InterleavingAudioCallback callback);
 
@@ -153,6 +153,11 @@ class AudioHandle
     /** Immediatley changes the audio callback to the interleaving callback passed in. */
     Result ChangeCallback(InterleavingAudioCallback callback);
 
+    /** Immediately clear the callback back to a nullptr
+     *  This will continue internal DMA IRQs, but will no longer
+     *  perform internal callbacks within the audio engine.
+     */
+    Result ClearCallback();
 
     class Impl;
 
