@@ -141,6 +141,8 @@ C_INCLUDES += \
 -I$(LIBDAISY_DIR)/Middlewares/ST/STM32_USB_Host_Library/Core/Inc \
 -I$(LIBDAISY_DIR)/Middlewares/ST/STM32_USB_Host_Library/Class/MSC/Inc \
 -I$(LIBDAISY_DIR)/Middlewares/ST/STM32_USB_Host_Library/Class/MIDI/Inc \
+-I$(LIBDAISY_DIR)/Middlewares/Third_Party/tinyusb_config \
+-I$(LIBDAISY_DIR)/Middlewares/Third_Party/tinyusb/src \
 -I$(SYSTEM_FILES_DIR)/
 
 ifdef DAISYSP_DIR

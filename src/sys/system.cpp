@@ -5,6 +5,7 @@
 #include "sys/dma.h"
 #include "per/gpio.h"
 #include "per/rng.h"
+#include "tusb.h"
 
 // global init functions for peripheral drivers.
 // These don't really need to be extern "C" anymore..
@@ -16,8 +17,8 @@ extern "C"
 }
 
 // boot info struct declared in persistent backup SRAM
-volatile daisy::System::BootInfo __attribute__((section(".backup_sram")))
-daisy::boot_info;
+volatile daisy::System::BootInfo
+    __attribute__((section(".backup_sram"))) daisy::boot_info;
 
 // Jump related stuff
 #define u32 uint32_t
@@ -91,34 +92,45 @@ extern "C"
     {
         HAL_IncTick();
         HAL_SYSTICK_IRQHandler();
+
+        // Queue PendSV_Handler
+        SCB->ICSR = SCB_ICSR_PENDSVSET_Msk;
     }
 
     /** USB IRQ Handlers since they are shared resources for multiple classes */
     extern HCD_HandleTypeDef hhcd_USB_OTG_HS;
     extern PCD_HandleTypeDef hpcd_USB_OTG_HS;
 
-    void OTG_HS_EP1_OUT_IRQHandler(void)
-    {
-        if(hhcd_USB_OTG_HS.Instance)
-            HAL_HCD_IRQHandler(&hhcd_USB_OTG_HS);
-        if(hpcd_USB_OTG_HS.Instance)
-            HAL_PCD_IRQHandler(&hpcd_USB_OTG_HS);
-    }
+    // void OTG_HS_EP1_OUT_IRQHandler(void)
+    // {
+    //     if(hhcd_USB_OTG_HS.Instance)
+    //         HAL_HCD_IRQHandler(&hhcd_USB_OTG_HS);
+    //     if(hpcd_USB_OTG_HS.Instance)
+    //         HAL_PCD_IRQHandler(&hpcd_USB_OTG_HS);
+    // }
 
-    void OTG_HS_EP1_IN_IRQHandler(void)
-    {
-        if(hhcd_USB_OTG_HS.Instance)
-            HAL_HCD_IRQHandler(&hhcd_USB_OTG_HS);
-        if(hpcd_USB_OTG_HS.Instance)
-            HAL_PCD_IRQHandler(&hpcd_USB_OTG_HS);
-    }
+    // void OTG_HS_EP1_IN_IRQHandler(void)
+    // {
+    //     if(hhcd_USB_OTG_HS.Instance)
+    //         HAL_HCD_IRQHandler(&hhcd_USB_OTG_HS);
+    //     if(hpcd_USB_OTG_HS.Instance)
+    //         HAL_PCD_IRQHandler(&hpcd_USB_OTG_HS);
+    // }
 
     void OTG_HS_IRQHandler(void)
     {
-        if(hhcd_USB_OTG_HS.Instance)
-            HAL_HCD_IRQHandler(&hhcd_USB_OTG_HS);
-        if(hpcd_USB_OTG_HS.Instance)
-            HAL_PCD_IRQHandler(&hpcd_USB_OTG_HS);
+        // if(hhcd_USB_OTG_HS.Instance)
+        //     HAL_HCD_IRQHandler(&hhcd_USB_OTG_HS);
+        // if(hpcd_USB_OTG_HS.Instance)
+        //     HAL_PCD_IRQHandler(&hpcd_USB_OTG_HS);
+
+        tusb_int_handler(1, true);
+        SCB->ICSR = SCB_ICSR_PENDSVSET_Msk;
+    }
+
+    void PendSV_Handler()
+    {
+        tud_task();
     }
 
     // TODO: Add some real handling to the HardFaultHandler
@@ -240,6 +252,9 @@ void System::Init(const System::Config& config)
     timcfg.dir    = TimerHandle::Config::CounterDir::UP;
     tim_.Init(timcfg);
     tim_.Start();
+
+    // PendSV gets lowest priority to call tud_task
+    HAL_NVIC_SetPriority(PendSV_IRQn, 0x0f, 0);
 
     // Initialize the true random number generator
     Random::Init();
@@ -485,15 +500,28 @@ void System::ConfigureClocks()
 
     PeriphClkInitStruct.PLL2.PLL2RGE    = RCC_PLL2VCIRANGE_2;
     PeriphClkInitStruct.PLL2.PLL2VCOSEL = RCC_PLL2VCOWIDE;
-    // PLL 3
-    PeriphClkInitStruct.PLL3.PLL3M         = 6;
-    PeriphClkInitStruct.PLL3.PLL3N         = 295;
-    PeriphClkInitStruct.PLL3.PLL3P         = 16; // 49.xMhz
-    PeriphClkInitStruct.PLL3.PLL3Q         = 4;
-    PeriphClkInitStruct.PLL3.PLL3R         = 32; // 24.xMhz
-    PeriphClkInitStruct.PLL3.PLL3RGE       = RCC_PLL3VCIRANGE_1;
-    PeriphClkInitStruct.PLL3.PLL3VCOSEL    = RCC_PLL3VCOWIDE;
-    PeriphClkInitStruct.PLL3.PLL3FRACN     = 0;
+
+    // PLL 3 (current mainline libDaisy)
+    // PeriphClkInitStruct.PLL3.PLL3M         = 6;
+    // PeriphClkInitStruct.PLL3.PLL3N         = 295;
+    // PeriphClkInitStruct.PLL3.PLL3P         = 16; // 49.xMhz
+    // PeriphClkInitStruct.PLL3.PLL3Q         = 4;
+    // PeriphClkInitStruct.PLL3.PLL3R         = 32; // 24.xMhz
+    // PeriphClkInitStruct.PLL3.PLL3RGE       = RCC_PLL3VCIRANGE_1;
+    // PeriphClkInitStruct.PLL3.PLL3VCOSEL    = RCC_PLL3VCOWIDE;
+    // PeriphClkInitStruct.PLL3.PLL3FRACN     = 0;
+
+    // PLL 3 (for more accurate fs=48kHz)
+    PeriphClkInitStruct.PLL3.PLL3M      = 15;
+    PeriphClkInitStruct.PLL3.PLL3N      = 368;
+    PeriphClkInitStruct.PLL3.PLL3P      = 16;
+    PeriphClkInitStruct.PLL3.PLL3Q      = 4;
+    PeriphClkInitStruct.PLL3.PLL3R      = 16;
+    PeriphClkInitStruct.PLL3.PLL3FRACN  = 5243;
+    PeriphClkInitStruct.PLL3.PLL3RGE    = RCC_PLL3VCIRANGE_1;
+    PeriphClkInitStruct.PLL3.PLL3VCOSEL = RCC_PLL3VCOWIDE;
+
+
     PeriphClkInitStruct.FmcClockSelection  = RCC_FMCCLKSOURCE_PLL2;
     PeriphClkInitStruct.QspiClockSelection = RCC_QSPICLKSOURCE_D1HCLK;
     //PeriphClkInitStruct.SdmmcClockSelection  = RCC_SDMMCCLKSOURCE_PLL;
@@ -507,7 +535,8 @@ void System::ConfigureClocks()
     PeriphClkInitStruct.I2c123ClockSelection  = RCC_I2C123CLKSOURCE_D2PCLK1;
     PeriphClkInitStruct.I2c4ClockSelection    = RCC_I2C4CLKSOURCE_PLL3;
     PeriphClkInitStruct.UsbClockSelection     = RCC_USBCLKSOURCE_HSI48;
-    PeriphClkInitStruct.AdcClockSelection     = RCC_ADCCLKSOURCE_PLL3;
+    PeriphClkInitStruct.AdcClockSelection     = RCC_ADCCLKSOURCE_PLL2;
+    // PeriphClkInitStruct.AdcClockSelection     = RCC_ADCCLKSOURCE_PLL3;
     if(HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
     {
         Error_Handler();
@@ -608,6 +637,11 @@ System::MemoryRegion System::GetMemoryRegion(uint32_t addr)
         return MemoryRegion::QSPI;
 
     return MemoryRegion::INVALID_ADDRESS;
+}
+
+bool System::IsDebuggerAttached()
+{
+    return CoreDebug->DHCSR & CoreDebug_DHCSR_C_DEBUGEN_Msk;
 }
 
 

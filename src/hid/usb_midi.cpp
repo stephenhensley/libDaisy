@@ -2,6 +2,7 @@
 #include "usbd_cdc.h"
 #include "usbh_midi.h"
 #include "hid/usb_midi.h"
+#include "tusb.h"
 #include <cassert>
 
 extern "C"
@@ -33,6 +34,9 @@ class MidiUsbTransport::Impl
     void UsbToMidi(uint8_t* buffer, uint8_t length);
     void MidiToUsb(uint8_t* buffer, size_t length);
     void Parse();
+
+    // added for tusb
+    void Rx();
 
   private:
     void MidiToUsbSingle(uint8_t* buffer, size_t length);
@@ -75,6 +79,14 @@ class MidiUsbTransport::Impl
 // Global Impl
 static MidiUsbTransport::Impl midi_usb_handle;
 
+extern "C"
+{
+    void tud_midi_rx_cb(uint8_t itf)
+    {
+        midi_usb_handle.Rx();
+    }
+}
+
 void ReceiveCallback(uint8_t* buffer, uint32_t* length)
 {
     if(midi_usb_handle.RxActive())
@@ -114,7 +126,7 @@ void MidiUsbTransport::Impl::Init(Config config)
     else
     {
         // This tells the USB middleware to send out MIDI descriptors instead of CDC
-        usbd_mode = USBD_MODE_MIDI;
+        // usbd_mode = USBD_MODE_MIDI;
 
         UsbHandle::UsbPeriph periph = UsbHandle::FS_INTERNAL;
         if(config_.periph == Config::EXTERNAL)
@@ -122,42 +134,82 @@ void MidiUsbTransport::Impl::Init(Config config)
 
         usb_handle_.Init(periph);
 
-        System::Delay(10);
-        usb_handle_.SetReceiveCallback(ReceiveCallback, periph);
+        // Removed because this will interfere with simultaneous cdc+midi usage.
+        // System::Delay(10);
+        // usb_handle_.SetReceiveCallback(ReceiveCallback, periph);
+    }
+}
+
+
+/** Only used by tinyUSB pipeline.
+ *  Reconcile with `Parse`, and other functions later. */
+void MidiUsbTransport::Impl::Rx()
+{
+    uint8_t packet[4];
+    while(tud_midi_available())
+    {
+        if(tud_midi_packet_read(packet))
+        {
+            if(!rx_active_ || parse_callback_ == nullptr)
+                continue;
+
+            const uint8_t cidx = packet[0];
+            if(cidx == 0x00 || cidx == 0x01)
+                continue;
+
+            const uint8_t size = code_index_size_[cidx];
+            parse_callback_(&packet[1], size, parse_context_);
+        }
     }
 }
 
 void MidiUsbTransport::Impl::Tx(uint8_t* buffer, size_t size)
 {
-    int  attempt_count = config_.tx_retry_count;
-    bool should_retry;
-
-    MidiToUsb(buffer, size);
-    do
+    if(config_.periph == Config::HOST)
     {
-        if(config_.periph == Config::HOST)
-        {
-            MIDI_ErrorTypeDef result;
-            result       = USBH_MIDI_Transmit(pUSB_Host, tx_buffer_, tx_ptr_);
-            should_retry = (result == MIDI_BUSY) && attempt_count--;
-        }
-        else
-        {
-            UsbHandle::Result result;
-            if(config_.periph == Config::EXTERNAL)
-                result = usb_handle_.TransmitExternal(tx_buffer_, tx_ptr_);
-            else
-                result = usb_handle_.TransmitInternal(tx_buffer_, tx_ptr_);
-            should_retry
-                = (result == UsbHandle::Result::ERR) && attempt_count--;
-        }
+        MIDI_ErrorTypeDef result;
+        MidiToUsb(buffer, size);
+        result = USBH_MIDI_Transmit(pUSB_Host, tx_buffer_, tx_ptr_);
+        (void)(result);
+    }
+    else
+    {
+        tud_midi_stream_write(0, buffer, size);
+    }
+
+    // FOR TINYUSB: we're removing the retry loops to see if they matter,
+    // and simplifying.
+    // This was the previous complete impl:
+
+    // int  attempt_count = config_.tx_retry_count;
+    // bool should_retry;
+
+    // MidiToUsb(buffer, size);
+    // do
+    // {
+    //     if(config_.periph == Config::HOST)
+    //     {
+    //         MIDI_ErrorTypeDef result;
+    //         result       = USBH_MIDI_Transmit(pUSB_Host, tx_buffer_, tx_ptr_);
+    //         should_retry = (result == MIDI_BUSY) && attempt_count--;
+    //     }
+    //     else
+    //     {
+    //         UsbHandle::Result result;
+    //         if(config_.periph == Config::EXTERNAL)
+    //             result = usb_handle_.TransmitExternal(tx_buffer_, tx_ptr_);
+    //         else
+    //             result = usb_handle_.TransmitInternal(tx_buffer_, tx_ptr_);
+    //         should_retry
+    //             = (result == UsbHandle::Result::ERR) && attempt_count--;
+    //     }
 
 
-        if(should_retry)
-            System::DelayUs(100);
-    } while(should_retry);
+    //     if(should_retry)
+    //         System::DelayUs(100);
+    // } while(should_retry);
 
-    tx_ptr_ = 0;
+    // tx_ptr_ = 0;
 }
 
 void MidiUsbTransport::Impl::UsbToMidi(uint8_t* buffer, uint8_t length)

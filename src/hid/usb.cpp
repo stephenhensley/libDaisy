@@ -3,6 +3,7 @@
 #include "usbd_desc.h"
 #include "usbd_cdc.h"
 #include "usbd_cdc_if.h"
+#include "tusb.h"
 
 using namespace daisy;
 
@@ -29,26 +30,44 @@ extern "C"
 
 UsbHandle::ReceiveCallback rx_callback;
 
+static constexpr const size_t kMaxUSBReceiveSize = 2048;
+static uint8_t                usb_receive_buffer[kMaxUSBReceiveSize];
+static bool                   usb_fs_hw_initialized = false;
+static bool                   usb_hs_hw_initialized = false;
+
 static void InitFS()
 {
     rx_callback = DummyRxCallback;
-    if(USBD_Init(&hUsbDeviceFS, &FS_Desc, DEVICE_FS) != USBD_OK)
+
+    if(!usb_fs_hw_initialized)
     {
-        UsbErrorHandler();
+        usb_fs_hw_initialized = true;
+        if(USBD_Init(&hUsbDeviceFS, NULL, DEVICE_FS) != USBD_OK)
+        {
+            UsbErrorHandler();
+        }
+        tusb_rhport_init_t dev_init
+            = {.role = TUSB_ROLE_DEVICE, .speed = TUSB_SPEED_AUTO};
+        tusb_init(0, &dev_init);
     }
-    if(USBD_RegisterClass(&hUsbDeviceFS, &USBD_CDC) != USBD_OK)
-    {
-        UsbErrorHandler();
-    }
-    if(USBD_CDC_RegisterInterface(&hUsbDeviceFS, &USBD_Interface_fops_FS)
-       != USBD_OK)
-    {
-        UsbErrorHandler();
-    }
-    if(USBD_Start(&hUsbDeviceFS) != USBD_OK)
-    {
-        UsbErrorHandler();
-    }
+    // STM32 USB Middleware
+    // if(USBD_Init(&hUsbDeviceFS, &FS_Desc, DEVICE_FS) != USBD_OK)
+    // {
+    //     UsbErrorHandler();
+    // }
+    // if(USBD_RegisterClass(&hUsbDeviceFS, &USBD_CDC) != USBD_OK)
+    // {
+    //     UsbErrorHandler();
+    // }
+    // if(USBD_CDC_RegisterInterface(&hUsbDeviceFS, &USBD_Interface_fops_FS)
+    //    != USBD_OK)
+    // {
+    //     UsbErrorHandler();
+    // }
+    // if(USBD_Start(&hUsbDeviceFS) != USBD_OK)
+    // {
+    //     UsbErrorHandler();
+    // }
 }
 
 static void DeinitFS()
@@ -62,23 +81,36 @@ static void DeinitFS()
 static void InitHS()
 {
     // HS as FS
-    if(USBD_Init(&hUsbDeviceHS, &HS_Desc, DEVICE_HS) != USBD_OK)
+    rx_callback = DummyRxCallback;
+    if(!usb_hs_hw_initialized)
     {
-        UsbErrorHandler();
+        usb_hs_hw_initialized = true;
+        if(USBD_Init(&hUsbDeviceHS, NULL, DEVICE_HS) != USBD_OK)
+        {
+            UsbErrorHandler();
+        }
+        tusb_rhport_init_t dev_init
+            = {.role = TUSB_ROLE_DEVICE, .speed = TUSB_SPEED_AUTO};
+        tusb_init(1, &dev_init);
     }
-    if(USBD_RegisterClass(&hUsbDeviceHS, &USBD_CDC) != USBD_OK)
-    {
-        UsbErrorHandler();
-    }
-    if(USBD_CDC_RegisterInterface(&hUsbDeviceHS, &USBD_Interface_fops_HS)
-       != USBD_OK)
-    {
-        UsbErrorHandler();
-    }
-    if(USBD_Start(&hUsbDeviceHS) != USBD_OK)
-    {
-        UsbErrorHandler();
-    }
+
+    // if(USBD_Init(&hUsbDeviceHS, &HS_Desc, DEVICE_HS) != USBD_OK)
+    // {
+    //     UsbErrorHandler();
+    // }
+    // if(USBD_RegisterClass(&hUsbDeviceHS, &USBD_CDC) != USBD_OK)
+    // {
+    //     UsbErrorHandler();
+    // }
+    // if(USBD_CDC_RegisterInterface(&hUsbDeviceHS, &USBD_Interface_fops_HS)
+    //    != USBD_OK)
+    // {
+    //     UsbErrorHandler();
+    // }
+    // if(USBD_Start(&hUsbDeviceHS) != USBD_OK)
+    // {
+    //     UsbErrorHandler();
+    // }
 }
 
 static void DeinitHS()
@@ -124,11 +156,17 @@ void UsbHandle::DeInit(UsbPeriph dev)
 
 UsbHandle::Result UsbHandle::TransmitInternal(uint8_t* buff, size_t size)
 {
-    return CDC_Transmit_FS(buff, size) == USBD_OK ? Result::OK : Result::ERR;
+    // return CDC_Transmit_FS(buff, size) == USBD_OK ? Result::OK : Result::ERR;
+    auto ret = tud_cdc_write(buff, size) == size ? Result::OK : Result::ERR;
+    tud_cdc_write_flush();
+    return ret;
 }
 UsbHandle::Result UsbHandle::TransmitExternal(uint8_t* buff, size_t size)
 {
-    return CDC_Transmit_HS(buff, size) == USBD_OK ? Result::OK : Result::ERR;
+    // return CDC_Transmit_HS(buff, size) == USBD_OK ? Result::OK : Result::ERR;
+    auto ret = tud_cdc_write(buff, size) == size ? Result::OK : Result::ERR;
+    tud_cdc_write_flush();
+    return ret;
 }
 
 void UsbHandle::SetReceiveCallback(ReceiveCallback cb, UsbPeriph dev)
@@ -137,16 +175,16 @@ void UsbHandle::SetReceiveCallback(ReceiveCallback cb, UsbPeriph dev)
     rx_callback = cb;
     rxcallback  = (CDC_ReceiveCallback)rx_callback;
 
-    switch(dev)
-    {
-        case FS_INTERNAL: CDC_Set_Rx_Callback_FS(rxcallback); break;
-        case FS_EXTERNAL: CDC_Set_Rx_Callback_HS(rxcallback); break;
-        case FS_BOTH:
-            CDC_Set_Rx_Callback_FS(rxcallback);
-            CDC_Set_Rx_Callback_HS(rxcallback);
-            break;
-        default: break;
-    }
+    // switch(dev)
+    // {
+    //     case FS_INTERNAL: CDC_Set_Rx_Callback_FS(rxcallback); break;
+    //     case FS_EXTERNAL: CDC_Set_Rx_Callback_HS(rxcallback); break;
+    //     case FS_BOTH:
+    //         CDC_Set_Rx_Callback_FS(rxcallback);
+    //         CDC_Set_Rx_Callback_HS(rxcallback);
+    //         break;
+    //     default: break;
+    // }
 }
 
 // Static Function Implementation
@@ -159,6 +197,29 @@ static void UsbErrorHandler()
 extern "C"
 {
     // Shared USB IRQ Handlers for USB HS peripheral are located in sys/System.cpp
+    void tud_cdc_rx_cb(uint8_t itf)
+    {
+        // since we only use a single port rn,
+        // we can use a static buffer of a max size..
+        size_t len = tud_cdc_available();
+        if(len <= kMaxUSBReceiveSize)
+        {
+            tud_cdc_read(usb_receive_buffer, len);
+
+            // TODO: Convert UsbHandle to use pimpl so we can access
+            // instances.. for callback dispatch..
+            // TODO: When/if this is no longer single port, revise
+            if(usb_fs_hw_initialized)
+            {
+                // Call USBHandle's RxCallback..
+            }
+            else if(usb_hs_hw_initialized)
+            {
+                // Call USBHandle's RxCallback..
+            }
+        }
+    }
+
 
     void OTG_FS_EP1_OUT_IRQHandler(void)
     {
@@ -170,5 +231,10 @@ extern "C"
         HAL_PCD_IRQHandler(&hpcd_USB_OTG_FS);
     }
 
-    void OTG_FS_IRQHandler(void) { HAL_PCD_IRQHandler(&hpcd_USB_OTG_FS); }
+    void OTG_FS_IRQHandler(void)
+    {
+        // HAL_PCD_IRQHandler(&hpcd_USB_OTG_FS);
+        tusb_int_handler(0, true);
+        SCB->ICSR = SCB_ICSR_PENDSVSET_Msk;
+    }
 }
