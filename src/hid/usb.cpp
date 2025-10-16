@@ -35,6 +35,9 @@ static uint8_t                usb_receive_buffer[kMaxUSBReceiveSize];
 static bool                   usb_fs_hw_initialized = false;
 static bool                   usb_hs_hw_initialized = false;
 
+static UsbHandle::ReceiveCallback s_rx_callback   = nullptr;
+static UsbHandle::UsbPeriph       s_active_periph = UsbHandle::FS_INTERNAL;
+
 static void InitFS()
 {
     rx_callback = DummyRxCallback;
@@ -172,8 +175,8 @@ UsbHandle::Result UsbHandle::TransmitExternal(uint8_t* buff, size_t size)
 void UsbHandle::SetReceiveCallback(ReceiveCallback cb, UsbPeriph dev)
 {
     // This is pretty silly, but we're working iteritavely...
-    rx_callback = cb;
-    rxcallback  = (CDC_ReceiveCallback)rx_callback;
+    // rx_callback = cb;
+    // rxcallback  = (CDC_ReceiveCallback)rx_callback;
 
     // switch(dev)
     // {
@@ -185,6 +188,9 @@ void UsbHandle::SetReceiveCallback(ReceiveCallback cb, UsbPeriph dev)
     //         break;
     //     default: break;
     // }
+
+    s_rx_callback   = cb;
+    s_active_periph = dev;
 }
 
 // Static Function Implementation
@@ -201,21 +207,14 @@ extern "C"
     {
         // since we only use a single port rn,
         // we can use a static buffer of a max size..
-        size_t len = tud_cdc_available();
+        uint32_t len = tud_cdc_available();
         if(len <= kMaxUSBReceiveSize)
         {
             tud_cdc_read(usb_receive_buffer, len);
-
-            // TODO: Convert UsbHandle to use pimpl so we can access
-            // instances.. for callback dispatch..
-            // TODO: When/if this is no longer single port, revise
-            if(usb_fs_hw_initialized)
+            if((usb_fs_hw_initialized || usb_hs_hw_initialized)
+               && s_rx_callback != nullptr)
             {
-                // Call USBHandle's RxCallback..
-            }
-            else if(usb_hs_hw_initialized)
-            {
-                // Call USBHandle's RxCallback..
+                s_rx_callback(usb_receive_buffer, &len);
             }
         }
     }

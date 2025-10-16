@@ -15,7 +15,7 @@ extern "C"
 
 // RHPort number used for device can be defined by board.mk, default to port 0
 #ifndef BOARD_TUD_RHPORT
-#define BOARD_TUD_RHPORT 1
+#define BOARD_TUD_RHPORT 0
 #endif
 
 // RHPort max operational speed can defined by board.mk
@@ -102,16 +102,16 @@ extern "C"
                       CFG_TUD_AUDIO_FUNC_1_N_CHANNELS_RX)
 
 #define CFG_TUD_AUDIO_FUNC_1_EP_OUT_SW_BUF_SZ \
-         CFG_TUD_AUDIO_FUNC_1_EP_OUT_SZ_MAX * 8
+    CFG_TUD_AUDIO_FUNC_1_EP_OUT_SZ_MAX * 8
 
 #define CFG_TUD_AUDIO_ENABLE_EP_IN 1
 
-#define CFG_TUD_AUDIO_FUNC_1_EP_IN_SZ_MAX                        \
+#define CFG_TUD_AUDIO_FUNC_1_EP_IN_SZ_MAX                         \
     TUD_AUDIO_EP_SIZE(CFG_TUD_AUDIO_FUNC_1_MAX_SAMPLE_RATE,       \
                       CFG_TUD_AUDIO_FUNC_1_N_BYTES_PER_SAMPLE_TX, \
                       CFG_TUD_AUDIO_FUNC_1_N_CHANNELS_TX)
 #define CFG_TUD_AUDIO_FUNC_1_EP_IN_SW_BUF_SZ \
-         CFG_TUD_AUDIO_FUNC_1_EP_IN_SZ_MAX * 8
+    CFG_TUD_AUDIO_FUNC_1_EP_IN_SZ_MAX * 8
 
 // Enable feedback EP
 #define CFG_TUD_AUDIO_ENABLE_FEEDBACK_EP 1
