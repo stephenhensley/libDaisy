@@ -6,20 +6,20 @@ extern "C"
 {
 #endif
 
-// This file provides definitions for building the descriptors and
-// usb driver configuration for UAC2 Audio Device class support with:
-//
-// - fixed sample rate of 48kHz
-// - 2ch of 16-bit input
-// - 2ch of 16-bit output
-//
-// The isochronous endpoints are configured for asynchronous operation
-// with feedback enabled, to provide stable  synchronization
-// using tinyusb - other types (synchronous, adaptive) do not work well,
-// since the peripheral clocks in the STM32 are fixed frequency and
-// it's not really feasible to adapt to SOF etc.
+    // This file provides definitions for building the descriptors and
+    // usb driver configuration for UAC2 Audio Device class support with:
+    //
+    // - fixed sample rate of 48kHz
+    // - 2ch of 16-bit input
+    // - 2ch of 16-bit output
+    //
+    // The isochronous endpoints are configured for asynchronous operation
+    // with feedback enabled, to provide stable  synchronization
+    // using tinyusb - other types (synchronous, adaptive) do not work well,
+    // since the peripheral clocks in the STM32 are fixed frequency and
+    // it's not really feasible to adapt to SOF etc.
 
-// clang-format off
+    // clang-format off
 #define UAC2_ENTITY_CLOCK               0x04
 
 // Speaker path
@@ -76,7 +76,7 @@ extern "C"
   /* Input Terminal Descriptor(4.7.2.4) */\
   TUD_AUDIO_DESC_INPUT_TERM(/*_termid*/ UAC2_ENTITY_SPK_INPUT_TERMINAL, /*_termtype*/ AUDIO_TERM_TYPE_USB_STREAMING, /*_assocTerm*/ 0x00, /*_clkid*/ UAC2_ENTITY_CLOCK, /*_nchannelslogical*/ CFG_TUD_AUDIO_FUNC_1_N_CHANNELS_RX, /*_channelcfg*/ AUDIO_CHANNEL_CONFIG_NON_PREDEFINED, /*_idxchannelnames*/ 0x00, /*_ctrl*/ 0 * (AUDIO_CTRL_R << AUDIO_IN_TERM_CTRL_CONNECTOR_POS), /*_stridx*/ 0x00),\
   /* Output Terminal Descriptor(4.7.2.5) */\
-  TUD_AUDIO_DESC_OUTPUT_TERM(/*_termid*/ UAC2_ENTITY_SPK_OUTPUT_TERMINAL, /*_termtype*/ AUDIO_TERM_TYPE_OUT_GENERIC_SPEAKER, /*_assocTerm*/ UAC2_ENTITY_SPK_INPUT_TERMINAL, /*_srcid*/ 0x00, /*_clkid*/ UAC2_ENTITY_CLOCK, /*_ctrl*/ 0x0000, /*_stridx*/ 0x00),\
+  TUD_AUDIO_DESC_OUTPUT_TERM(/*_termid*/ UAC2_ENTITY_SPK_OUTPUT_TERMINAL, /*_termtype*/ AUDIO_TERM_TYPE_OUT_GENERIC_SPEAKER, /*_assocTerm*/ UAC2_ENTITY_SPK_INPUT_TERMINAL, /*_srcid*/ UAC2_ENTITY_SPK_INPUT_TERMINAL, /*_clkid*/ UAC2_ENTITY_CLOCK, /*_ctrl*/ 0x0000, /*_stridx*/ 0x00),\
   /* Input Terminal Descriptor(4.7.2.4) */\
   TUD_AUDIO_DESC_INPUT_TERM(/*_termid*/ UAC2_ENTITY_MIC_INPUT_TERMINAL, /*_termtype*/ AUDIO_TERM_TYPE_IN_GENERIC_MIC, /*_assocTerm*/ 0x00, /*_clkid*/ UAC2_ENTITY_CLOCK, /*_nchannelslogical*/ CFG_TUD_AUDIO_FUNC_1_N_CHANNELS_TX, /*_channelcfg*/ AUDIO_CHANNEL_CONFIG_NON_PREDEFINED, /*_idxchannelnames*/ 0x00, /*_ctrl*/ 0 * (AUDIO_CTRL_R << AUDIO_IN_TERM_CTRL_CONNECTOR_POS), /*_stridx*/ 0x00),\
   /* Output Terminal Descriptor(4.7.2.5) */\

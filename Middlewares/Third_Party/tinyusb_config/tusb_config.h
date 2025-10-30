@@ -121,8 +121,8 @@ extern "C"
 // We restrict us here to have a constant number for all audio functions (which means this has to be
 // the maximum number of AS interfaces an audio function has and a second audio function with less
 // AS interfaces just wastes a few bytes)
-// #define CFG_TUD_AUDIO_FUNC_1_N_AS_INT 2
-#define CFG_TUD_AUDIO_FUNC_1_N_AS_INT 1
+#define CFG_TUD_AUDIO_FUNC_1_N_AS_INT 2
+// #define CFG_TUD_AUDIO_FUNC_1_N_AS_INT 1
 
 // Size of control request buffer
 #define CFG_TUD_AUDIO_FUNC_1_CTRL_BUF_SZ 64
